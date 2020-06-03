@@ -608,6 +608,8 @@ void sgx_encl_release(struct kref *ref)
 
 	if (encl->backing)
 		fput(encl->backing);
+ 
+	cleanup_srcu_struct(&encl->srcu);
 
 	WARN_ON_ONCE(!list_empty(&encl->mm_list));
 
