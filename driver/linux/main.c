@@ -91,10 +91,17 @@ static bool sgx_reclaimer_age(struct sgx_epc_page *epc_page)
 	list_for_each_entry_rcu(encl_mm, &encl->mm_list, list) {
 		if (!mmget_not_zero(encl_mm->mm))
 			continue;
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+                mmap_read_lock(encl_mm->mm);
+#else
 		down_read(&encl_mm->mm->mmap_sem);
+#endif
 		ret = !sgx_encl_test_and_clear_young(encl_mm->mm, page);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+                mmap_read_unlock(encl_mm->mm);
+#else
 		up_read(&encl_mm->mm->mmap_sem);
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0) || LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0) )
                 mmput(encl_mm->mm);
@@ -135,14 +142,20 @@ static void sgx_reclaimer_block(struct sgx_epc_page *epc_page)
 		list_for_each_entry_rcu(encl_mm, &encl->mm_list, list) {
 			if (!mmget_not_zero(encl_mm->mm))
 				continue;
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+			mmap_read_lock(encl_mm->mm);
+#else
 			down_read(&encl_mm->mm->mmap_sem);
+#endif
 
 			ret = sgx_encl_find(encl_mm->mm, addr, &vma);
 			if (!ret && encl == vma->vm_private_data)
 				zap_vma_ptes(vma, addr, PAGE_SIZE);
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+			mmap_read_unlock(encl_mm->mm);
+#else
 			up_read(&encl_mm->mm->mmap_sem);
+#endif
 
 #if (LINUX_VERSION_CODE < KERNEL_VERSION(5, 0, 0) || LINUX_VERSION_CODE > KERNEL_VERSION(5, 4, 0) )
                         mmput(encl_mm->mm);

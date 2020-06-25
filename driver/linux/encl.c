@@ -46,7 +46,8 @@ static int __sgx_encl_eldu(struct sgx_encl_page *encl_page,
 		pginfo.secs = 0;
 
 	ret = __eldu(&pginfo, sgx_get_epc_addr(epc_page),
-		     sgx_get_epc_addr(encl_page->va_page->epc_page) + va_offset);
+		     sgx_get_epc_addr(encl_page->va_page->epc_page) +
+				      va_offset);
 	if (ret) {
 		if (encls_failed(ret))
 			ENCLS_WARN(ret, "ELDU");
@@ -222,7 +223,9 @@ int sgx_encl_mm_add(struct sgx_encl *encl, struct mm_struct *mm)
 	int ret;
 
 	/* mm_list can be accessed only by a single thread at a time. */
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0))
+#if(LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+	mmap_assert_write_locked(mm);
+#elif (LINUX_VERSION_CODE >= KERNEL_VERSION(5,3,0))
 	lockdep_assert_held_write(&mm->mmap_sem);
 #else
 	lockdep_assert_held_exclusive(&mm->mmap_sem);

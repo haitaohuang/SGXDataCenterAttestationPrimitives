@@ -162,7 +162,6 @@ static struct miscdevice sgx_dev_provision = {
 	.fops = &sgx_provision_fops,
 };
 
-
 int __init sgx_drv_init(void)
 {
 	unsigned int eax, ebx, ecx, edx;

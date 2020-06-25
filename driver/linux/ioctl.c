@@ -396,8 +396,11 @@ static int sgx_encl_add_page(struct sgx_encl *encl, unsigned long src,
 		ret = PTR_ERR(va_page);
 		goto err_out_free;
 	}
-
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+	mmap_read_lock(current->mm);
+#else
 	down_read(&current->mm->mmap_sem);
+#endif
 	mutex_lock(&encl->lock);
 
 	/*
@@ -439,7 +442,11 @@ static int sgx_encl_add_page(struct sgx_encl *encl, unsigned long src,
 
 	sgx_mark_page_reclaimable(encl_page->epc_page);
 	mutex_unlock(&encl->lock);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+	mmap_read_unlock(current->mm);
+#else
 	up_read(&current->mm->mmap_sem);
+#endif
 	return ret;
 
 err_out:
@@ -449,7 +456,11 @@ err_out:
 err_out_unlock:
 	sgx_encl_shrink(encl, va_page);
 	mutex_unlock(&encl->lock);
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,8,0))
+	mmap_read_unlock(current->mm);
+#else
 	up_read(&current->mm->mmap_sem);
+#endif
 
 err_out_free:
 	sgx_free_epc_page(epc_page);
@@ -767,7 +778,7 @@ out:
  * Mark the enclave as being allowed to access a restricted attribute bit.
  * The requested attribute is specified via the attribute_fd field in the
  * provided struct sgx_enclave_set_attribute.  The attribute_fd must be a
- * handle to an SGX attribute file, e.g. “/dev/sgx/provision".
+ * handle to an SGX attribute file, e.g. "/dev/sgx/provision".
  *
  * Failure to explicitly request access to a restricted attribute will cause
  * sgx_ioc_enclave_init() to fail.  Currently, the only restricted attribute
