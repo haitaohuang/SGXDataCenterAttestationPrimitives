@@ -88,14 +88,6 @@ static int sgx_release(struct inode *inode, struct file *file)
 	return 0;
 }
 
-#ifdef CONFIG_COMPAT
-static long sgx_compat_ioctl(struct file *filep, unsigned int cmd,
-			      unsigned long arg)
-{
-	return sgx_ioctl(filep, cmd, arg);
-}
-#endif
-
 static int sgx_mmap(struct file *file, struct vm_area_struct *vma)
 {
 	struct sgx_encl *encl = file->private_data;
@@ -131,6 +123,14 @@ static unsigned long sgx_get_unmapped_area(struct file *file,
 
 	return current->mm->get_unmapped_area(file, addr, len, pgoff, flags);
 }
+
+#ifdef CONFIG_COMPAT
+static long sgx_compat_ioctl(struct file *filep, unsigned int cmd,
+			      unsigned long arg)
+{
+	return sgx_ioctl(filep, cmd, arg);
+}
+#endif
 
 static const struct file_operations sgx_encl_fops = {
 	.owner			= THIS_MODULE,
