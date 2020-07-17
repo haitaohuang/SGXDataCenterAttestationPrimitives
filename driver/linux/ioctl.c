@@ -416,8 +416,8 @@ static int sgx_encl_add_page(struct sgx_encl *encl, unsigned long src,
 	 * can't be gracefully unwound, while failure on EADD/EXTEND is limited
 	 * to userspace errors (or kernel/hardware bugs).
 	 */
-	ret = radix_tree_insert(&encl->page_tree, PFN_DOWN(encl_page->desc),
-				encl_page);
+	ret = xa_insert(&encl->page_array, PFN_DOWN(encl_page->desc),
+			encl_page, GFP_KERNEL);
 	if (ret)
 		goto err_out_unlock;
 
@@ -451,8 +451,7 @@ static int sgx_encl_add_page(struct sgx_encl *encl, unsigned long src,
 	return ret;
 
 err_out:
-	radix_tree_delete(&encl_page->encl->page_tree,
-			  PFN_DOWN(encl_page->desc));
+	xa_erase(&encl->page_array, PFN_DOWN(encl_page->desc));
 
 err_out_unlock:
 	sgx_encl_shrink(encl, va_page);
@@ -851,6 +850,5 @@ long sgx_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 
 out:
 	atomic_andnot(SGX_ENCL_IOCTL, &encl->flags);
-
 	return ret;
 }

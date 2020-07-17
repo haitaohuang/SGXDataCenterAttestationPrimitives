@@ -107,7 +107,7 @@ static struct sgx_encl_page *sgx_encl_load_page(struct sgx_encl *encl,
 	if ((flags & SGX_ENCL_DEAD) || !(flags & SGX_ENCL_INITIALIZED))
 		return ERR_PTR(-EFAULT);
 
-	entry = radix_tree_lookup(&encl->page_tree, addr >> PAGE_SHIFT);
+	entry = xa_load(&encl->page_array, PFN_DOWN(addr));
 	if (!entry)
 		return ERR_PTR(-EFAULT);
 
@@ -364,10 +364,13 @@ out:
  *   -EACCES if VMA permissions exceed enclave page permissions
  */
 int sgx_encl_may_map(struct sgx_encl *encl, unsigned long start,
-		     unsigned long end, unsigned long vm_prot_bits)
+		     unsigned long end, unsigned long vm_flags)
 {
-	unsigned long idx, idx_start, idx_end;
+	unsigned long vm_prot_bits = vm_flags & (VM_READ | VM_WRITE | VM_EXEC);
+	unsigned long idx_start = PFN_DOWN(start);
+	unsigned long idx_end = PFN_DOWN(end - 1);
 	struct sgx_encl_page *page;
+	XA_STATE(xas, &encl->page_array, idx_start);
 
 	/*
 	 * Disallow RIE tasks as their VMA permissions might conflict with the
@@ -376,27 +379,25 @@ int sgx_encl_may_map(struct sgx_encl *encl, unsigned long start,
 	if (!!(current->personality & READ_IMPLIES_EXEC))
 		return -EACCES;
 
-	idx_start = PFN_DOWN(start);
-	idx_end = PFN_DOWN(end - 1);
-
-	for (idx = idx_start; idx <= idx_end; ++idx) {
-		mutex_lock(&encl->lock);
-		page = radix_tree_lookup(&encl->page_tree, idx);
-		mutex_unlock(&encl->lock);
-
+	xas_for_each(&xas, page, idx_end)
 		if (!page || (~page->vm_max_prot_bits & vm_prot_bits))
 			return -EACCES;
-	}
 
 	return 0;
 }
 
 /* ! Note: Not ported from inkernel patches
-static int sgx_vma_mprotect(struct vm_area_struct *vma, unsigned long start,
-			    unsigned long end, unsigned long prot)
+static int sgx_vma_mprotect(struct vm_area_struct *vma,
+			    struct vm_area_struct **pprev, unsigned long start,
+			    unsigned long end, unsigned long newflags)
 {
-	return sgx_encl_may_map(vma->vm_private_data, start, end,
-				calc_vm_prot_bits(prot, 0));
+	int ret;
+
+	ret = sgx_encl_may_map(vma->vm_private_data, start, end, newflags);
+	if (ret)
+		return ret;
+
+	return mprotect_fixup(vma, pprev, start, end, newflags);
 }
 */
 
@@ -489,7 +490,7 @@ out:
 const struct vm_operations_struct sgx_vm_ops = {
 	.open = sgx_vma_open,
 	.fault = sgx_vma_fault,
-//	.may_mprotect = sgx_vma_mprotect,
+//	.mprotect = sgx_vma_mprotect, //not ported for OOT
 	.access = sgx_vma_access,
 };
 
@@ -533,14 +534,11 @@ void sgx_encl_destroy(struct sgx_encl *encl)
 {
 	struct sgx_va_page *va_page;
 	struct sgx_encl_page *entry;
-	struct radix_tree_iter iter;
-	void **slot;
+	unsigned long index;
 
 	atomic_or(SGX_ENCL_DEAD, &encl->flags);
 
-	radix_tree_for_each_slot(slot, &encl->page_tree, &iter, 0) {
-		entry = *slot;
-
+	xa_for_each(&encl->page_array, index, entry) {
 		if (entry->epc_page) {
 			/*
 			 * The page and its radix tree entry cannot be freed
@@ -554,10 +552,10 @@ void sgx_encl_destroy(struct sgx_encl *encl)
 			entry->epc_page = NULL;
 		}
 
-		radix_tree_delete(&entry->encl->page_tree,
-				  PFN_DOWN(entry->desc));
 		kfree(entry);
 	}
+
+	xa_destroy(&encl->page_array);
 
 	if (!encl->secs_child_cnt && encl->secs.epc_page) {
 		sgx_free_epc_page(encl->secs.epc_page);
