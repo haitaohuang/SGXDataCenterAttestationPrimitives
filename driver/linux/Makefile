@@ -8,7 +8,7 @@ intel_sgx-y := encl.o main.o driver.o ioctl.o
 
 else
 
-KDIR := /lib/modules/$(shell uname -r)/build
+KDIR ?= /lib/modules/$(shell uname -r)/build
 
 INKERNEL_SGX :=$(shell cat $(KDIR)/.config | grep "CONFIG_INTEL_SGX=y")
 ifneq ($(INKERNEL_SGX),)

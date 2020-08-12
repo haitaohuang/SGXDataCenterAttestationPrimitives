@@ -51,8 +51,8 @@ Build and Install the Intel(R) SGX Driver
 -----------------------------------------
 ### Prerequisites
 - Ensure that you have the following required operating systems:
-  * Ubuntu* 16.04 LTS Desktop 64bits - minimal kernel 4.10
-  * Ubuntu* 16.04 LTS Server 64bits - minimal kernel 4.10
+  * Ubuntu* 16.04 LTS Desktop 64bits - minimal kernel 4.15
+  * Ubuntu* 16.04 LTS Server 64bits - minimal kernel 4.15
   * Ubuntu* 18.04 LTS Desktop 64bits
   * Ubuntu* 18.04 LTS Server 64bits
   * Red Hat Enterprise Linux Server 8 (RHEL 8) 64bits
@@ -100,7 +100,9 @@ Build and Install the Intel(R) SGX Driver
 
 
 ### Build
-To build the Intel(R) SGX Driver use the following command line:
+To build driver as a debian or rpm package to be distributed, run script [build_dkms_deb.sh](build_dkms_deb.sh) or [build_dkms_rpm.sh](build_dkms_rpm.sh), respectively. The script will copy built package to current directory. You can then use dpkg/rpm tool to install on different systems.
+
+To build the Intel(R) SGX Driver for local development, use the following command line:
 ```
 $ make
 ```
@@ -108,6 +110,8 @@ To clean the build area and remove all the generated and build files use:
 ```
 $ make clean
 ```
+
+
 ### Install
 The Intel(R) SGX driver supports DKMS installation, to install the driver follow the following steps:
 - Ensure that the DKMS package is installed, or install it using:
