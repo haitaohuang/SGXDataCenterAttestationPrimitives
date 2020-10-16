@@ -459,8 +459,11 @@ err_out_free:
 	 * Destroy enclave on ENCLS failure as this means that EPC has been
 	 * invalidated.
 	 */
-	if (ret == -EIO)
+	if (ret == -EIO){
+		mutex_lock(&encl->lock);
 		sgx_encl_destroy(encl);
+		mutex_unlock(&encl->lock);
+	}
 
 	return ret;
 }
@@ -802,8 +805,10 @@ long sgx_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 	if (encl_flags & SGX_ENCL_IOCTL)
 		return -EBUSY;
 
-	if (encl_flags & SGX_ENCL_DEAD)
-		return -EFAULT;
+	if (encl_flags & SGX_ENCL_DEAD){
+		ret = -EFAULT;
+		goto out;
+	}
 
 	switch (cmd) {
 	case SGX_IOC_ENCLAVE_CREATE:
@@ -822,7 +827,7 @@ long sgx_ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		ret = -ENOIOCTLCMD;
 		break;
 	}
-
+out:
 	atomic_andnot(SGX_ENCL_IOCTL, &encl->flags);
 
 	return ret;
