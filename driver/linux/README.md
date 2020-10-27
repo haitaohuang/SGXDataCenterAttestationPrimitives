@@ -193,3 +193,18 @@ This table lists the equivalent upstream kernel patch for each version of the dr
 | 1.36           | V36                     | NO      | NO      | NO            | YES     |
 
 \* Requires updated [udev rules](./10-sgx.rules)
+
+Monitoring (Proposal)
+-----------------------------------------------
+The driver built with compile time flag, ENABLE_STATS, exports following sysfs files.
+Global stats under /sys/kernel/sgx:
+	- free_epc_pages
+	- total_epc_pages
+	- va_pages_in_use
+	- accumulative_swapped_out_epc_pages
+	- accumulative_page_faults
+	* per process stats under /sys/kernel/sgx/<pid>
+		- per enclave stats under /sys/kernel/sgx/<pid>/<fd>
+	
+
+
