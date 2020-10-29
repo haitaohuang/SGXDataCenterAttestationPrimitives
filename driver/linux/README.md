@@ -196,15 +196,36 @@ This table lists the equivalent upstream kernel patch for each version of the dr
 
 Monitoring (Proposal)
 -----------------------------------------------
-The driver built with compile time flag, ENABLE_STATS, exports following sysfs files.
-Global stats under /sys/kernel/sgx:
+
+### Export stats to user space via sysfs
+
+The driver built with a compile time flag, CONFIG_SGX_STATS, exports following sysfs files.
+
+```
+* /sys/kernel/sgx: (global stats)
 	- free_epc_pages
 	- total_epc_pages
 	- va_pages_in_use
 	- accumulative_swapped_out_epc_pages
-	- accumulative_page_faults
-	* per process stats under /sys/kernel/sgx/<pid>
-		- per enclave stats under /sys/kernel/sgx/<pid>/<fd>
-	
+	- accumulative_swapped_in_epc_pages
+	* /sys/kernel/sgx/<pid> (per process stats)
+		* /sys/kernel/sgx/<pid>/<fd> (per enclave stats)
+			- enclave_resident_size = EPC pages loaded
+			- enclave_epc_load_size = EPC pages EADDed (and EAUGed with EDMM implemented) - EREMOVED
+			- enclave_elrange_size = enclave->secs->size in pages
+			- accumulative_swapped_out_epc_pages
+			- accumulative_swapped_in_epc_pages
+```
+
+### Design considerations
+
+- Monitoring is not yet considered in upstream patches. To avoid divergence with future kernel implementation. We only enable this feature for driver build with the compiler flag CONFIG_SGX_STATS turned on.
+- All leaf files are read-only sysfs files, each containing one value in ASCII characters. 
+- User space open those files to read corresponding values out, and calculate additional values if needed, such as:
+  * swapped out per enclave = enclave_epc_load_size – enclave_resident_size
+  * pages paged out to backing store (global or per enclave) =  accumulative_swapped_out_epc_pages - accumulative_swapped_in_epc_pages
+  * total resident for $pid = sum of all enclave_resident_size under /sys/kernel/sgx/$pid
+- The stats only account enclave fd under PID of the host process that initially opened an fd to /dev/sgx/enclave
+   * If a process send the open fd to another process (via socket or forking a child) to shared the enclave, the target process pid won't be added under /sys/kernel/sgx folder. 
 
 
