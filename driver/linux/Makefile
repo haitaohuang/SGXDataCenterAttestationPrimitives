@@ -10,6 +10,7 @@ else
 
 KDIR := /lib/modules/$(shell uname -r)/build
 KSYM_MMPUT_ASYNC := $(shell grep  "mmput_async\svmlinux\sEXPORT" $(KDIR)/Module.symvers)
+MMU_NOTIFIER_UNREGISTER_NO_RELEASE := $(shell grep  "mmu_notifier_unregister_no_release\svmlinux\sEXPORT" $(KDIR)/Module.symvers)
 KSYM_LOOKUP := $(shell grep "kallsyms_lookup_name\svmlinux\sEXPORT" $(KDIR)/Module.symvers)
 EXTRA_CFLAGS :=
 ifneq ($(KSYM_MMPUT_ASYNC),)
@@ -17,6 +18,9 @@ ifneq ($(KSYM_MMPUT_ASYNC),)
 endif
 ifneq ($(KSYM_LOOKUP),)
 	 EXTRA_CFLAGS += -DHAVE_KSYM_LOOKUP
+endif
+ifneq ($(MMU_NOTIFIER_UNREGISTER_NO_RELEASE),)
+	 EXTRA_CFLAGS += -DHAVE_MMU_NOTIFIER_UNREGISTER_NO_RELEASE
 endif
 INKERNEL_SGX :=$(shell cat $(KDIR)/.config | grep "CONFIG_X86_SGX=y\|CONFIG_INTEL_SGX=y")
 ifneq ($(INKERNEL_SGX),)

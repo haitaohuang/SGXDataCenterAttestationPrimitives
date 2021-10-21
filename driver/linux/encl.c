@@ -529,7 +529,7 @@ void sgx_encl_release(struct kref *ref)
 	kfree(encl);
 }
 
-#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0))
+#if (LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0) && defined(HAS_MMU_NOTIFIER_UNREGISTER_NO_RELEASE))
 static void sgx_encl_mm_release_deferred(struct rcu_head *rcu)
 {
 	struct sgx_encl_mm *encl_mm =
@@ -563,7 +563,7 @@ static void sgx_mmu_notifier_release(struct mmu_notifier *mn,
 
 	if (tmp == encl_mm) {
 		synchronize_srcu(&encl_mm->encl->srcu);
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0) || !defined(HAS_MMU_NOTIFIER_UNREGISTER_NO_RELEASE))
 		mmu_notifier_put(mn);
 #else
             /*
@@ -577,7 +577,7 @@ static void sgx_mmu_notifier_release(struct mmu_notifier *mn,
 	}
 }
 
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0) || !defined(HAS_MMU_NOTIFIER_UNREGISTER_NO_RELEASE))
 static void sgx_mmu_notifier_free(struct mmu_notifier *mn)
 {
 	struct sgx_encl_mm *encl_mm = container_of(mn, struct sgx_encl_mm, mmu_notifier);
@@ -588,7 +588,7 @@ static void sgx_mmu_notifier_free(struct mmu_notifier *mn)
 
 static const struct mmu_notifier_ops sgx_mmu_notifier_ops = {
 	.release		= sgx_mmu_notifier_release,
-#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0))
+#if (LINUX_VERSION_CODE >= KERNEL_VERSION(5,4,0) || !defined(HAS_MMU_NOTIFIER_UNREGISTER_NO_RELEASE))
 	.free_notifier		= sgx_mmu_notifier_free,
 #endif
 };
