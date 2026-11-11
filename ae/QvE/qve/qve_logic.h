@@ -11,6 +11,7 @@
 #include <cstddef>
 #include <cstring>
 #include <map>
+#include <string>
 #include <type_traits>
 
 #include "CertVerification/CertificateChain.h"
@@ -252,6 +253,8 @@ time_t getLatestIssueDate(const CertificateChain &chain);
 time_t getEarliestExpirationDate(const CertificateChain &chain);
 
 quote3_error_t deserializeVerCollatInfo(const std::vector<uint8_t> &bytes, verification_collateral_info_t &info);
+
+quote3_error_t copyLegacyTcbStatus(const std::string& status, char* output, size_t size, bool extended_result);
 
 bool isTdxTcbHigherOrEqual(const intel::sgx::dcap::Quote& quote, const parser::json::TcbLevel& tcbLevel);
 bool isTcbComponentSvnHigherOrEqual(const parser::x509::PckCertificate& pckCert, const parser::json::TcbLevel& tcbLevel);

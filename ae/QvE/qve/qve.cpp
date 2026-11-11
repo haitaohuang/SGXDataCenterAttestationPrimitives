@@ -673,29 +673,22 @@ static quote3_error_t servtd_set_quote_supplemental_data(
     p_servtd_suppl_data->pce_svn = components.pce_svn;
     p_servtd_suppl_data->platform_tcb_date = components.platform.date;
 
-    auto st = printTCBStatus(static_cast<Status>(components.platform.status));
-    size_t len = st.length();
-
-    if (len > TCB_STATUS_LEN - 1)
-        return SGX_QL_ERROR_UNEXPECTED;
-
-    std::copy_n(st.c_str(), len, p_servtd_suppl_data->tcb_status);
-    p_servtd_suppl_data->tcb_status[len] = '\0';
+    auto status_result = copyLegacyTcbStatus(
+        printTCBStatus(static_cast<Status>(components.platform.status)),
+        p_servtd_suppl_data->tcb_status, TCB_STATUS_LEN, result_version == 2);
+    if (status_result != SGX_QL_SUCCESS) {
+        return status_result;
+    }
 
     // Get QE TCB date and TCB status
     p_servtd_suppl_data->qe_tcb_date = components.qe.date;
 
-    auto qe_st = printTCBStatus(static_cast<Status>(components.qe.status));
-    const char* qe_status_str = qe_st.c_str();
-    size_t qe_status_len = strlen(qe_status_str);
-
-    if (qe_status_len > TCB_STATUS_LEN - 1) {
-        return SGX_QL_ERROR_UNEXPECTED;
+    status_result = copyLegacyTcbStatus(
+        printTCBStatus(static_cast<Status>(components.qe.status)),
+        p_servtd_suppl_data->qe_tcb_status, TCB_STATUS_LEN, result_version == 2);
+    if (status_result != SGX_QL_SUCCESS) {
+        return status_result;
     }
-
-    std::copy_n(qe_status_str, qe_status_len, p_servtd_suppl_data->qe_tcb_status);
-
-    p_servtd_suppl_data->qe_tcb_status[qe_status_len] = '\0';
 
     p_servtd_suppl_data->tcb_date = (p_servtd_suppl_data->platform_tcb_date < p_servtd_suppl_data->qe_tcb_date) ?
                                     p_servtd_suppl_data->platform_tcb_date : p_servtd_suppl_data->qe_tcb_date;

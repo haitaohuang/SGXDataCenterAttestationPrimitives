@@ -89,7 +89,9 @@ struct servtd_tdx_quote_suppl_data {
         char                       qe_tcb_status[TCB_STATUS_LEN];        /*   790     32 */
 };
 
-/* Launch evaluation (TEE_TCB_SVN). All integers use the x86-64 little-endian ABI. */
+/* Launch evaluation (TEE_TCB_SVN). All integers use the x86-64 little-endian ABI.
+ * Legacy status fields are empty when the complete component status cannot fit;
+ * tcb_status below always contains the full aggregate status. */
 struct servtd_tdx_quote_suppl_data_v2 {
         struct servtd_tdx_quote_suppl_data legacy;
         uint16_t version;

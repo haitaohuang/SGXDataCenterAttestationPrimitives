@@ -117,6 +117,23 @@ quote3_error_t qve_get_collateral_dates(const CertificateChain &cert_chain_obj,
     return SGX_QL_SUCCESS;
 }
 
+quote3_error_t copyLegacyTcbStatus(const std::string& status, char* output, size_t size, bool extended_result) {
+    if (output == nullptr || size == 0) {
+        return SGX_QL_ERROR_INVALID_PARAMETER;
+    }
+    if (status.size() >= size) {
+        if (!extended_result) {
+            return SGX_QL_ERROR_UNEXPECTED;
+        }
+        // Ex2 carries the full aggregate status separately. Never truncate a
+        // status that cannot fit the legacy field, or reject its extended result.
+        std::fill_n(output, size, '\0');
+        return SGX_QL_SUCCESS;
+    }
+    std::copy_n(status.c_str(), status.size() + 1, output);
+    return SGX_QL_SUCCESS;
+}
+
 quote3_error_t deserializeVerCollatInfo(const std::vector<uint8_t> &bytes, verification_collateral_info_t &info) {
     info = {};
     if (bytes.size() < VER_COLLAT_V2_SIZE) {

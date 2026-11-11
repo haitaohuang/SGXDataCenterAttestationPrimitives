@@ -76,6 +76,27 @@ TEST(TcbStatusStringToQlQveResultTest, UnknownOrMiscasedReturnsUnspecified) {
     EXPECT_EQ(tcb_status_string_to_ql_qve_result("NotAStatus"), SGX_QL_QV_RESULT_UNSPECIFIED);
 }
 
+TEST(CopyLegacyTcbStatusTest, CopiesFittingStatusForBothResultVersions) {
+    for (bool extended : {false, true}) {
+        char output[32];
+        std::fill_n(output, sizeof(output), 'x');
+        EXPECT_EQ(copyLegacyTcbStatus("OutOfDateConfigurationNeeded", output, sizeof(output), extended), SGX_QL_SUCCESS);
+        EXPECT_STREQ(output, "OutOfDateConfigurationNeeded");
+    }
+}
+
+TEST(CopyLegacyTcbStatusTest, LegacyResultStillRejectsUnrepresentableStatus) {
+    char output[32] = {};
+    EXPECT_EQ(copyLegacyTcbStatus("ConfigurationAndSWHardeningNeeded", output, sizeof(output), false), SGX_QL_ERROR_UNEXPECTED);
+}
+
+TEST(CopyLegacyTcbStatusTest, ExtendedResultLeavesUnrepresentableStatusEmpty) {
+    char output[32];
+    std::fill_n(output, sizeof(output), 'x');
+    EXPECT_EQ(copyLegacyTcbStatus("ConfigurationAndSWHardeningNeeded", output, sizeof(output), true), SGX_QL_SUCCESS);
+    EXPECT_TRUE(std::all_of(output, output + sizeof(output), [](char c) { return c == '\0'; }));
+}
+
 TEST(ParseBytesLETest, ParseUint16) {
     // given
     uint8_t raw[] = {0x34, 0x12}; // Little-endian representation of 0x1234

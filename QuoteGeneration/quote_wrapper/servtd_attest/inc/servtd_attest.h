@@ -211,6 +211,8 @@ __attribute__((visibility("default"))) servtd_attest_error_t verify_quote_integr
  * A NULL p_quote_collateral uses the same collateral retrieval as
  * verify_quote_integrity. Existing entry points retain the legacy 822-byte
  * result regardless of buffer capacity. Component data is the launch evaluation.
+ * Use the extended aggregate status; a legacy component-status field is empty
+ * when its complete status cannot fit in that legacy field.
  */
 __attribute__((visibility("default"))) servtd_attest_error_t verify_quote_integrity_ex2(
             const void* p_quote, uint32_t quote_size,
