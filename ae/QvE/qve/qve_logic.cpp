@@ -118,11 +118,8 @@ quote3_error_t qve_get_collateral_dates(const CertificateChain &cert_chain_obj,
 }
 
 quote3_error_t deserializeVerCollatInfo(const std::vector<uint8_t> &bytes, verification_collateral_info_t &info) {
-    // The v2 verification collateral info is a fixed-size record. The producer
-    // emits at least sizeof(verification_collateral_info_t) bytes; any trailing
-    // bytes beyond the record are ignored.
-    if (bytes.empty() ||
-        bytes.size() < sizeof(verification_collateral_info_t)) {
+    info = {};
+    if (bytes.size() < VER_COLLAT_V2_SIZE) {
         return SGX_QL_ERROR_INVALID_PARAMETER;
     }
 
@@ -144,6 +141,10 @@ quote3_error_t deserializeVerCollatInfo(const std::vector<uint8_t> &bytes, verif
 
     info.version = parseBytesLE<decltype(Data::version)>(bytes.data(), offset);
     offset += sizeof(Data::version);
+    if (info.id != 1 || (info.version != 2 && info.version != 3) ||
+        (info.version == 3 && bytes.size() < sizeof(info))) {
+        return SGX_QL_ERROR_INVALID_PARAMETER;
+    }
 
     info.issue_date_min = parseBytesLE<decltype(Data::issue_date_min)>(bytes.data(), offset);
     offset += sizeof(Data::issue_date_min);
@@ -174,6 +175,55 @@ quote3_error_t deserializeVerCollatInfo(const std::vector<uint8_t> &bytes, verif
 
     copyCharField(info.current_tcb_status, sizeof(Data::current_tcb_status), offset);
     offset += sizeof(Data::current_tcb_status);
+
+    if (info.version == 3) {
+        auto parseComponent = [&](component_tcb_info_t& component) {
+            component.date = parseBytesLE<int64_t>(bytes.data(), offset);
+            offset += sizeof(component.date);
+            component.status = parseBytesLE<uint32_t>(bytes.data(), offset);
+            offset += sizeof(component.status);
+        };
+        for (auto* evaluation : {&info.launch_components, &info.current_components}) {
+            evaluation->flags = parseBytesLE<uint32_t>(bytes.data(), offset);
+            offset += sizeof(evaluation->flags);
+            parseComponent(evaluation->platform);
+            parseComponent(evaluation->tdx_module);
+            parseComponent(evaluation->qe);
+            std::copy_n(bytes.data() + offset, sizeof(evaluation->sgx_tcb_components), evaluation->sgx_tcb_components);
+            offset += sizeof(evaluation->sgx_tcb_components);
+            std::copy_n(bytes.data() + offset, sizeof(evaluation->tdx_tcb_components), evaluation->tdx_tcb_components);
+            offset += sizeof(evaluation->tdx_tcb_components);
+            evaluation->pce_svn = parseBytesLE<uint16_t>(bytes.data(), offset);
+            offset += sizeof(evaluation->pce_svn);
+            evaluation->tdx_module_svn = bytes[offset++];
+            evaluation->qe_svn = parseBytesLE<uint16_t>(bytes.data(), offset);
+            offset += sizeof(evaluation->qe_svn);
+
+            const uint32_t knownFlags = QVL_COMPONENT_PLATFORM | QVL_COMPONENT_TDX_MODULE |
+                                        QVL_COMPONENT_QE | QVL_COMPONENT_TDX_MODULE_BUNDLED;
+            if ((evaluation->flags & ~knownFlags) != 0 ||
+                ((evaluation->flags & QVL_COMPONENT_TDX_MODULE_BUNDLED) != 0 &&
+                 (evaluation->flags & QVL_COMPONENT_TDX_MODULE) == 0)) {
+                return SGX_QL_ERROR_INVALID_PARAMETER;
+            }
+            const component_tcb_info_t components[] = {evaluation->platform, evaluation->tdx_module, evaluation->qe};
+            const uint32_t validStatuses[] = {
+                STATUS_OK, STATUS_TCB_OUT_OF_DATE, STATUS_TCB_REVOKED,
+                STATUS_TCB_CONFIGURATION_NEEDED, STATUS_TCB_OUT_OF_DATE_CONFIGURATION_NEEDED,
+                STATUS_TCB_SW_HARDENING_NEEDED, STATUS_TCB_CONFIGURATION_AND_SW_HARDENING_NEEDED
+            };
+            for (size_t i = 0; i < 3; ++i) {
+                if ((evaluation->flags & (1U << i)) != 0 &&
+                    (components[i].date <= 0 ||
+                     std::find(std::begin(validStatuses), std::end(validStatuses), components[i].status) == std::end(validStatuses))) {
+                    return SGX_QL_ERROR_INVALID_PARAMETER;
+                }
+            }
+        }
+        info.tcb_info_eval_data_num = parseBytesLE<uint32_t>(bytes.data(), offset);
+        offset += sizeof(info.tcb_info_eval_data_num);
+        info.qe_eval_data_num = parseBytesLE<uint32_t>(bytes.data(), offset);
+    }
 
     return SGX_QL_SUCCESS;
 }

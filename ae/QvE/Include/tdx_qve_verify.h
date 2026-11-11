@@ -16,6 +16,16 @@ __attribute__ ((visibility("default"))) quote3_error_t do_verify_quote_integrity
 		uint8_t *p_td_report,
 		uint32_t * p_td_report_size);
 
+__attribute__ ((visibility("default"))) quote3_error_t do_verify_quote_integrity_ex(
+        const uint8_t *p_quote,
+        uint32_t quote_size,
+        const uint8_t *root_pub_key,
+        uint32_t root_pub_key_size,
+        const tdx_ql_qv_collateral_t *p_quote_collateral,
+        uint8_t *p_td_report,
+        uint32_t *p_td_report_size,
+        uint16_t result_version);
+
 
 #if defined(__cplusplus)
 }

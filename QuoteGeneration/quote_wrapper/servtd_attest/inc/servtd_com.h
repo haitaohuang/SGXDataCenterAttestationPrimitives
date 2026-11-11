@@ -82,12 +82,30 @@ struct servtd_tdx_quote_suppl_data {
         sgx_measurement_t          mr_signer;            /*   698    32 */
         sgx_prod_id_t              isv_prod_id;          /*   730     2 */
         sgx_isv_svn_t              isv_svn;              /*   732     2 */
-        time_t                     tcb_date;             /*   734     64 */ /* Represents the effective TCB date, calculated as: min(platform_tcb_date, qe_tcb_date) */
-        char                       tcb_status[TCB_STATUS_LEN];           /*   798     32 */
-        time_t                     platform_tcb_date;    /*   830     64 */
-        time_t                     qe_tcb_date;          /*   894     64 */
-        char                       qe_tcb_status[TCB_STATUS_LEN];        /*   958     32 */
+        time_t                     tcb_date;             /*   734     8 */ /* Legacy: min(platform, QE); v2: QVL launch aggregate. */
+        char                       tcb_status[TCB_STATUS_LEN];           /*   742     32 */
+        time_t                     platform_tcb_date;    /*   774     8 */
+        time_t                     qe_tcb_date;          /*   782     8 */
+        char                       qe_tcb_status[TCB_STATUS_LEN];        /*   790     32 */
 };
+
+/* Launch evaluation (TEE_TCB_SVN). All integers use the x86-64 little-endian ABI. */
+struct servtd_tdx_quote_suppl_data_v2 {
+        struct servtd_tdx_quote_suppl_data legacy;
+        uint16_t version;
+        uint16_t size;
+        uint32_t component_flags; /* QvlComponentTcbFlags */
+        int64_t tdx_module_tcb_date;
+        uint32_t tcb_eval_data_num;
+        uint32_t tcb_info_eval_data_num;
+        uint32_t qe_eval_data_num;
+        char tcb_status[50]; /* Full QVL aggregate status, including TD-relaunch variants. */
+};
+
+#if defined(__cplusplus)
+static_assert(sizeof(servtd_tdx_quote_suppl_data) == 822, "ServTD legacy ABI mismatch");
+static_assert(sizeof(servtd_tdx_quote_suppl_data_v2) == 900, "ServTD component ABI mismatch");
+#endif
 
 static const unsigned SERVTD_HEADER_SIZE = 4;
 static const uint32_t SERVTD_REQ_BUF_SIZE = 16 * 4 * 1024; // 16 pages

@@ -8,6 +8,7 @@
 
 #include <algorithm>
 #include <climits>
+#include <cstddef>
 #include <cstring>
 #include <map>
 #include <type_traits>
@@ -31,6 +32,25 @@ using namespace intel::sgx::dcap::pckparser;
 
 
 #pragma pack(push, 1) // Set alignment to 1 byte
+struct component_tcb_info_t
+{
+    int64_t date {0};
+    uint32_t status {STATUS_TCB_NOT_SUPPORTED};
+};
+
+struct component_tcb_evaluation_t
+{
+    uint32_t flags {0};
+    component_tcb_info_t platform {};
+    component_tcb_info_t tdx_module {};
+    component_tcb_info_t qe {};
+    uint8_t sgx_tcb_components[16] = {0};
+    uint8_t tdx_tcb_components[16] = {0};
+    uint16_t pce_svn {0};
+    uint8_t tdx_module_svn {0};
+    uint16_t qe_svn {0};
+};
+
 struct verification_collateral_info_t
 {
     // header
@@ -52,8 +72,15 @@ struct verification_collateral_info_t
 
     char launch_tcb_status[VER_COLLAT_TCB_STATUS_SIZE] = {0};
     char current_tcb_status[VER_COLLAT_TCB_STATUS_SIZE] = {0};
+    component_tcb_evaluation_t launch_components {};
+    component_tcb_evaluation_t current_components {};
+    uint32_t tcb_info_eval_data_num {0};
+    uint32_t qe_eval_data_num {0};
 };
 #pragma pack(pop) // Restore default alignment
+
+constexpr size_t VER_COLLAT_V2_SIZE = offsetof(verification_collateral_info_t, launch_components);
+static_assert(sizeof(verification_collateral_info_t) == VER_COLLAT_V2_SIZE + 162, "QVL v3 layout mismatch");
 
 struct supplemental_dates_t
 {
@@ -76,14 +103,15 @@ T parseBytesLE(const uint8_t *raw, size_t offset = 0)
 
     static constexpr size_t SIZE = sizeof(T);
 
-    T ret{0};
+    using Unsigned = typename std::make_unsigned<T>::type;
+    Unsigned ret{0};
     for(size_t i = offset, pos = SIZE - 1; i < offset + SIZE; ++i, --pos)
     {
         const size_t op = (SIZE - 1 - pos) * 8;
-        ret |= static_cast<T>(raw[i]) << op;
+        ret |= static_cast<Unsigned>(raw[i]) << op;
     }
 
-    return ret;
+    return static_cast<T>(ret);
 }
 
 /**

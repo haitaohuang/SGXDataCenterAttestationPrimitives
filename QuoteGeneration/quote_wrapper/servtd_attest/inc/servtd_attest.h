@@ -207,6 +207,19 @@ __attribute__((visibility("default"))) servtd_attest_error_t verify_quote_integr
             uint32_t* p_tdx_servtd_suppl_data_size);
 
 /**
+ * Verify a quote and return servtd_tdx_quote_suppl_data_v2 (900 bytes).
+ * A NULL p_quote_collateral uses the same collateral retrieval as
+ * verify_quote_integrity. Existing entry points retain the legacy 822-byte
+ * result regardless of buffer capacity. Component data is the launch evaluation.
+ */
+__attribute__((visibility("default"))) servtd_attest_error_t verify_quote_integrity_ex2(
+            const void* p_quote, uint32_t quote_size,
+            const void* root_pub_key, uint32_t root_pub_key_size,
+            const tdx_ql_qv_collateral_t *p_quote_collateral,
+            void* p_tdx_servtd_suppl_data,
+            uint32_t* p_tdx_servtd_suppl_data_size);
+
+/**
  * Initialize heap space for ServTD Attestation library internal use.
  * Must be called only once by ServTD before other attestation lib APIs
  *

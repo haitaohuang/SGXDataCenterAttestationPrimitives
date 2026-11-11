@@ -123,14 +123,15 @@ servtd_attest_error_t verify_quote_integrity(
     return map_quote3_error_to_servtd_attest_error(verify_status);
 }
 
-servtd_attest_error_t verify_quote_integrity_ex(
+static servtd_attest_error_t verify_quote_integrity_impl(
                         const void* p_quote,
                         uint32_t quote_size,
                         const void* root_pub_key,
                         uint32_t root_pub_key_size,
                         const tdx_ql_qv_collateral_t *p_quote_collateral,
                         void* p_tdx_servtd_suppl_data,
-                        uint32_t* p_tdx_servtd_suppl_data_size)
+                        uint32_t* p_tdx_servtd_suppl_data_size,
+                        uint16_t result_version)
 {
     quote3_error_t verify_status = SGX_QL_SUCCESS;
 
@@ -150,16 +151,37 @@ servtd_attest_error_t verify_quote_integrity_ex(
     }
 
     // only verify quote's integrity
-    verify_status = do_verify_quote_integrity(
+    verify_status = do_verify_quote_integrity_ex(
                         (const uint8_t*)p_quote,
                         quote_size,
                         (const uint8_t*)root_pub_key,
                         root_pub_key_size,
                         p_quote_collateral,
                         (uint8_t*)p_tdx_servtd_suppl_data,
-                        (uint32_t*)p_tdx_servtd_suppl_data_size);
+                        (uint32_t*)p_tdx_servtd_suppl_data_size,
+                        result_version);
 
     return map_quote3_error_to_servtd_attest_error(verify_status);
+}
+
+servtd_attest_error_t verify_quote_integrity_ex(
+                        const void* p_quote, uint32_t quote_size,
+                        const void* root_pub_key, uint32_t root_pub_key_size,
+                        const tdx_ql_qv_collateral_t *p_quote_collateral,
+                        void* p_tdx_servtd_suppl_data, uint32_t* p_tdx_servtd_suppl_data_size)
+{
+    return verify_quote_integrity_impl(p_quote, quote_size, root_pub_key, root_pub_key_size,
+                                      p_quote_collateral, p_tdx_servtd_suppl_data, p_tdx_servtd_suppl_data_size, 1);
+}
+
+servtd_attest_error_t verify_quote_integrity_ex2(
+                        const void* p_quote, uint32_t quote_size,
+                        const void* root_pub_key, uint32_t root_pub_key_size,
+                        const tdx_ql_qv_collateral_t *p_quote_collateral,
+                        void* p_tdx_servtd_suppl_data, uint32_t* p_tdx_servtd_suppl_data_size)
+{
+    return verify_quote_integrity_impl(p_quote, quote_size, root_pub_key, root_pub_key_size,
+                                      p_quote_collateral, p_tdx_servtd_suppl_data, p_tdx_servtd_suppl_data_size, 2);
 }
 
 /**

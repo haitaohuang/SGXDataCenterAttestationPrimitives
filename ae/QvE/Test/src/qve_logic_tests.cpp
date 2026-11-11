@@ -192,6 +192,8 @@ TEST(DeserializeVerCollatInfoTest, InsufficientData) {
 TEST(DeserializeVerCollatInfoTest, ExtraTrailingBytesIgnored) {
     // given: buffer larger than the fixed-size record; trailing bytes are ignored.
     std::vector<uint8_t> input(sizeof(verification_collateral_info_t) + 16, 0);
+    input[0] = 1;
+    input[2] = 2;
     verification_collateral_info_t verification_collateral_info;
 
     // when
@@ -204,6 +206,8 @@ TEST(DeserializeVerCollatInfoTest, ExtraTrailingBytesIgnored) {
 TEST(DeserializeVerCollatInfoTest, AdvisoryIdsBoundary) {
     // given: exact-size buffer with content at the current_advisory_ids boundaries.
     std::vector<uint8_t> input(sizeof(verification_collateral_info_t), 0);
+    input[0] = 1;
+    input[2] = 2;
     const size_t currentAdvOffset = offsetof(verification_collateral_info_t, current_advisory_ids);
     input[currentAdvOffset] = 'X';
     input[currentAdvOffset + VER_COLLAT_ADVISORY_IDS_SIZE - 1] = '\0';
@@ -216,6 +220,61 @@ TEST(DeserializeVerCollatInfoTest, AdvisoryIdsBoundary) {
     EXPECT_EQ(ret, SGX_QL_SUCCESS);
     EXPECT_EQ(verification_collateral_info.current_advisory_ids[0], 'X');
     EXPECT_EQ(verification_collateral_info.current_advisory_ids[VER_COLLAT_ADVISORY_IDS_SIZE - 1], '\0');
+}
+
+TEST(DeserializeVerCollatInfoTest, ComponentResultsAndVersionBounds) {
+    std::vector<uint8_t> input(sizeof(verification_collateral_info_t), 0);
+    input[0] = 1;
+    input[2] = 3;
+    const char status[] = "TDRelaunchAdvisedConfigurationNeeded";
+    std::copy_n(status, sizeof(status), input.begin() + offsetof(verification_collateral_info_t, launch_tcb_status));
+    size_t offset = VER_COLLAT_V2_SIZE;
+    auto put = [&](uint64_t value, size_t size) {
+        for (size_t i = 0; i < size; ++i) {
+            input[offset++] = static_cast<uint8_t>(value >> (i * 8));
+        }
+    };
+    for (size_t i = 0; i < 2; ++i) {
+        put(QVL_COMPONENT_PLATFORM | QVL_COMPONENT_TDX_MODULE | QVL_COMPONENT_QE, 4);
+        put(300, 8); put(STATUS_OK, 4);
+        put(100 + i, 8); put(i == 0 ? STATUS_TCB_OUT_OF_DATE : STATUS_OK, 4);
+        put(200, 8); put(STATUS_OK, 4);
+        offset += 32;
+        put(5, 2);
+        put(2 + i, 1);
+        put(6, 2);
+    }
+    put(20, 4);
+    put(13, 4);
+    ASSERT_EQ(offset, input.size());
+
+    verification_collateral_info_t info;
+    ASSERT_EQ(deserializeVerCollatInfo(input, info), SGX_QL_SUCCESS);
+    EXPECT_EQ(info.launch_components.platform.date, 300);
+    EXPECT_EQ(info.launch_components.tdx_module.date, 100);
+    EXPECT_EQ(info.current_components.tdx_module.date, 101);
+    EXPECT_EQ(info.launch_components.qe.date, 200);
+    EXPECT_EQ(info.launch_components.tdx_module.status, STATUS_TCB_OUT_OF_DATE);
+    EXPECT_EQ(info.current_components.tdx_module.status, STATUS_OK);
+    EXPECT_EQ(info.launch_components.pce_svn, 5);
+    EXPECT_EQ(info.current_components.tdx_module_svn, 3);
+    EXPECT_EQ(info.launch_components.qe_svn, 6);
+    EXPECT_EQ(info.tcb_info_eval_data_num, 20);
+    EXPECT_EQ(info.qe_eval_data_num, 13);
+    EXPECT_STREQ(info.launch_tcb_status, status);
+
+    for (size_t size : {VER_COLLAT_V2_SIZE - 1, VER_COLLAT_V2_SIZE, input.size() - 1}) {
+        EXPECT_EQ(deserializeVerCollatInfo(std::vector<uint8_t>(input.begin(), input.begin() + size), info),
+                  SGX_QL_ERROR_INVALID_PARAMETER);
+    }
+    input[2] = 4;
+    EXPECT_EQ(deserializeVerCollatInfo(input, info), SGX_QL_ERROR_INVALID_PARAMETER);
+    input[2] = 3;
+    input[VER_COLLAT_V2_SIZE + 3] = 0x80;
+    EXPECT_EQ(deserializeVerCollatInfo(input, info), SGX_QL_ERROR_INVALID_PARAMETER);
+    input[VER_COLLAT_V2_SIZE + 3] = 0;
+    std::fill_n(input.begin() + VER_COLLAT_V2_SIZE + 4, 8, 0);
+    EXPECT_EQ(deserializeVerCollatInfo(input, info), SGX_QL_ERROR_INVALID_PARAMETER);
 }
 
 TEST(GetEarliestIssueDateTest, EmptyChain) {
