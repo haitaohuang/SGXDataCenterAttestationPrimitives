@@ -604,6 +604,16 @@ json::IdentityTcbLevel getMatchingQETcbLevel(const json::EnclaveIdentity &enclav
 
     throw SGX_QL_TCBINFO_UNSUPPORTED_FORMAT;  //FIXME(pre-existing): throws raw integer error code. Consider throwing a proper exception, descended from std::exception
 }
+static size_t servtd_result_size(uint16_t version)
+{
+    switch (version) {
+    case 1: return sizeof(servtd_tdx_quote_suppl_data);
+    case 2: return sizeof(servtd_tdx_quote_suppl_data_v2);
+    case 3: return sizeof(servtd_tdx_quote_suppl_data_v3);
+    default: return 0;
+    }
+}
+
 /**
  * @brief Return supplemental data for TD Migration
  *
@@ -630,8 +640,7 @@ static quote3_error_t servtd_set_quote_supplemental_data(
 
     const auto& components = verificationCollateralInfo.launch_components;
     const uint32_t required = QVL_COMPONENT_PLATFORM | QVL_COMPONENT_TDX_MODULE | QVL_COMPONENT_QE;
-    if (verificationCollateralInfo.version != 3 || (components.flags & required) != required ||
-        (result_version != 1 && result_version != 2)) {
+    if (verificationCollateralInfo.version != 3 || (components.flags & required) != required) {
         return SGX_QL_ERROR_INVALID_PARAMETER;
     }
     if (p_fmspc == NULL || p_fmspc_size != FMSPC_SIZE) {
@@ -641,9 +650,8 @@ static quote3_error_t servtd_set_quote_supplemental_data(
         p_servtd_supplemental_data_size == NULL) {
         return SGX_QL_ERROR_INVALID_PARAMETER;
     }
-    const size_t result_size = result_version == 2 ? sizeof(servtd_tdx_quote_suppl_data_v2)
-                                                   : sizeof(servtd_tdx_quote_suppl_data);
-    if ((*p_servtd_supplemental_data_size) < result_size) {
+    const size_t result_size = servtd_result_size(result_version);
+    if (result_size == 0 || (*p_servtd_supplemental_data_size) < result_size) {
         return SGX_QL_ERROR_INVALID_PARAMETER;
     }
     if (quote.getHeader().teeType != constants::TEE_TYPE_TDX) {
@@ -675,7 +683,7 @@ static quote3_error_t servtd_set_quote_supplemental_data(
 
     auto status_result = copyLegacyTcbStatus(
         printTCBStatus(static_cast<Status>(components.platform.status)),
-        p_servtd_suppl_data->tcb_status, TCB_STATUS_LEN, result_version == 2);
+        p_servtd_suppl_data->tcb_status, TCB_STATUS_LEN, result_version >= 2);
     if (status_result != SGX_QL_SUCCESS) {
         return status_result;
     }
@@ -685,7 +693,7 @@ static quote3_error_t servtd_set_quote_supplemental_data(
 
     status_result = copyLegacyTcbStatus(
         printTCBStatus(static_cast<Status>(components.qe.status)),
-        p_servtd_suppl_data->qe_tcb_status, TCB_STATUS_LEN, result_version == 2);
+        p_servtd_suppl_data->qe_tcb_status, TCB_STATUS_LEN, result_version >= 2);
     if (status_result != SGX_QL_SUCCESS) {
         return status_result;
     }
@@ -727,9 +735,9 @@ static quote3_error_t servtd_set_quote_supplemental_data(
     }
     p_servtd_suppl_data->isv_prod_id = qe_report.isvProdID;
     p_servtd_suppl_data->isv_svn = components.qe_svn;
-    if (result_version == 2) {
+    if (result_version >= 2) {
         auto* extended = reinterpret_cast<servtd_tdx_quote_suppl_data_v2*>(p_servtd_supplemental_data);
-        extended->version = 2;
+        extended->version = result_version;
         extended->size = static_cast<uint16_t>(result_size);
         extended->component_flags = components.flags;
         extended->legacy.tcb_date = verificationCollateralInfo.launch_tcb_date;
@@ -738,6 +746,12 @@ static quote3_error_t servtd_set_quote_supplemental_data(
         extended->tcb_info_eval_data_num = verificationCollateralInfo.tcb_info_eval_data_num;
         extended->qe_eval_data_num = verificationCollateralInfo.qe_eval_data_num;
         std::copy_n(verificationCollateralInfo.launch_tcb_status, sizeof(extended->tcb_status), extended->tcb_status);
+    }
+    if (result_version == 3) {
+        auto* extended = reinterpret_cast<servtd_tdx_quote_suppl_data_v3*>(p_servtd_supplemental_data);
+        extended->platform_tcb_status = status_error_to_ql_qve_result(static_cast<Status>(components.platform.status));
+        extended->tdx_module_tcb_status = status_error_to_ql_qve_result(static_cast<Status>(components.tdx_module.status));
+        extended->qe_tcb_status = status_error_to_ql_qve_result(static_cast<Status>(components.qe.status));
     }
     *p_servtd_supplemental_data_size = static_cast<uint32_t>(result_size);
     return SGX_QL_SUCCESS;
@@ -1326,11 +1340,10 @@ quote3_error_t sgx_qve_verify_quote(
         return SGX_QL_ERROR_INVALID_PARAMETER;
     }
 #ifdef SERVTD_ATTEST
-   const size_t servtd_result_size = servtd_result_version == 2 ? sizeof(servtd_tdx_quote_suppl_data_v2)
-                                                               : sizeof(servtd_tdx_quote_suppl_data);
-   if ((servtd_result_version != 1 && servtd_result_version != 2) ||
+   const size_t result_size = servtd_result_size(servtd_result_version);
+   if (result_size == 0 ||
        p_td_report_body == NULL || root_pub_key == NULL || p_td_report_body_size == NULL ||
-       (*p_td_report_body_size) < servtd_result_size || root_pub_key_size <= 0) {
+       (*p_td_report_body_size) < result_size || root_pub_key_size <= 0) {
            return SGX_QL_ERROR_INVALID_PARAMETER;
     }
     unsigned char fmspc_from_quote[FMSPC_SIZE] = { 0 };
