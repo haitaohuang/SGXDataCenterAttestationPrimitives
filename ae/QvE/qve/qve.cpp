@@ -609,7 +609,6 @@ static size_t servtd_result_size(uint16_t version)
     switch (version) {
     case 1: return sizeof(servtd_tdx_quote_suppl_data);
     case 2: return sizeof(servtd_tdx_quote_suppl_data_v2);
-    case 3: return sizeof(servtd_tdx_quote_suppl_data_v3);
     default: return 0;
     }
 }
@@ -683,7 +682,7 @@ static quote3_error_t servtd_set_quote_supplemental_data(
 
     auto status_result = copyLegacyTcbStatus(
         printTCBStatus(static_cast<Status>(components.platform.status)),
-        p_servtd_suppl_data->tcb_status, TCB_STATUS_LEN, result_version >= 2);
+        p_servtd_suppl_data->tcb_status, TCB_STATUS_LEN, result_version == 2);
     if (status_result != SGX_QL_SUCCESS) {
         return status_result;
     }
@@ -693,7 +692,7 @@ static quote3_error_t servtd_set_quote_supplemental_data(
 
     status_result = copyLegacyTcbStatus(
         printTCBStatus(static_cast<Status>(components.qe.status)),
-        p_servtd_suppl_data->qe_tcb_status, TCB_STATUS_LEN, result_version >= 2);
+        p_servtd_suppl_data->qe_tcb_status, TCB_STATUS_LEN, result_version == 2);
     if (status_result != SGX_QL_SUCCESS) {
         return status_result;
     }
@@ -735,7 +734,7 @@ static quote3_error_t servtd_set_quote_supplemental_data(
     }
     p_servtd_suppl_data->isv_prod_id = qe_report.isvProdID;
     p_servtd_suppl_data->isv_svn = components.qe_svn;
-    if (result_version >= 2) {
+    if (result_version == 2) {
         auto* extended = reinterpret_cast<servtd_tdx_quote_suppl_data_v2*>(p_servtd_supplemental_data);
         extended->version = result_version;
         extended->size = static_cast<uint16_t>(result_size);
@@ -746,9 +745,6 @@ static quote3_error_t servtd_set_quote_supplemental_data(
         extended->tcb_info_eval_data_num = verificationCollateralInfo.tcb_info_eval_data_num;
         extended->qe_eval_data_num = verificationCollateralInfo.qe_eval_data_num;
         std::copy_n(verificationCollateralInfo.launch_tcb_status, sizeof(extended->tcb_status), extended->tcb_status);
-    }
-    if (result_version == 3) {
-        auto* extended = reinterpret_cast<servtd_tdx_quote_suppl_data_v3*>(p_servtd_supplemental_data);
         extended->platform_tcb_status = status_error_to_ql_qve_result(static_cast<Status>(components.platform.status));
         extended->tdx_module_tcb_status = status_error_to_ql_qve_result(static_cast<Status>(components.tdx_module.status));
         extended->qe_tcb_status = status_error_to_ql_qve_result(static_cast<Status>(components.qe.status));

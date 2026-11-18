@@ -4,7 +4,6 @@ global:
     verify_quote_integrity;
     verify_quote_integrity_ex;
     verify_quote_integrity_ex2;
-    verify_quote_integrity_ex3;
     init_heap;
 local:
     *;

@@ -102,12 +102,7 @@ struct servtd_tdx_quote_suppl_data_v2 {
         uint32_t tcb_info_eval_data_num;
         uint32_t qe_eval_data_num;
         char tcb_status[50]; /* Full QVL aggregate status, including TD-relaunch variants. */
-};
-
-/* Component statuses use sgx_ql_qv_result_t values, stored as little-endian u32.
- * The nested version/size fields describe this complete v3 record. */
-struct servtd_tdx_quote_suppl_data_v3 {
-        struct servtd_tdx_quote_suppl_data_v2 v2;
+        /* Component statuses use sgx_ql_qv_result_t values. */
         uint32_t platform_tcb_status;
         uint32_t tdx_module_tcb_status;
         uint32_t qe_tcb_status;
@@ -115,8 +110,7 @@ struct servtd_tdx_quote_suppl_data_v3 {
 
 #if defined(__cplusplus)
 static_assert(sizeof(servtd_tdx_quote_suppl_data) == 822, "ServTD legacy ABI mismatch");
-static_assert(sizeof(servtd_tdx_quote_suppl_data_v2) == 900, "ServTD component ABI mismatch");
-static_assert(sizeof(servtd_tdx_quote_suppl_data_v3) == 912, "ServTD component status ABI mismatch");
+static_assert(sizeof(servtd_tdx_quote_suppl_data_v2) == 912, "ServTD component ABI mismatch");
 #endif
 
 static const unsigned SERVTD_HEADER_SIZE = 4;
